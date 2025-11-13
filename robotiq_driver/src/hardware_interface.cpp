@@ -3,16 +3,16 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-//    * Redistributions of source code must retain the above copyright
-//      notice, this list of conditions and the following disclaimer.
+// * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
 //
-//    * Redistributions in binary form must reproduce the above copyright
-//      notice, this list of conditions and the following disclaimer in the
-//      documentation and/or other materials provided with the distribution.
+// * Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
 //
-//    * Neither the name of the {copyright_holder} nor the names of its
-//      contributors may be used to endorse or promote products derived from
-//      this software without specific prior written permission.
+// * Neither the name of the {copyright_holder} nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -31,27 +31,25 @@
 #include <limits>
 #include <memory>
 #include <vector>
-
+#include <algorithm>
 #include <robotiq_driver/default_driver_factory.hpp>
 #include <robotiq_driver/hardware_interface.hpp>
-
 #include <hardware_interface/actuator_interface.hpp>
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
-
 #include <rclcpp/rclcpp.hpp>
 
 const auto kLogger = rclcpp::get_logger("RobotiqGripperHardwareInterface");
 
 constexpr uint8_t kGripperMinPos = 3;
 constexpr uint8_t kGripperMaxPos = 230;
-constexpr double kGripperMaxSpeed = 0.150;  // mm/s
-constexpr double kGripperMaxforce = 235;    // N
+constexpr double kGripperMaxSpeed = 0.150; // mm/s
+constexpr double kGripperMaxforce = 235; // N
 constexpr uint8_t kGripperRange = kGripperMaxPos - kGripperMinPos;
-
 constexpr auto kGripperCommsLoopPeriod = std::chrono::milliseconds{ 10 };
 
 namespace robotiq_driver
 {
+
 RobotiqGripperHardwareInterface::RobotiqGripperHardwareInterface()
 {
   driver_factory_ = std::make_unique<DefaultDriverFactory>();
@@ -66,7 +64,7 @@ RobotiqGripperHardwareInterface::~RobotiqGripperHardwareInterface()
   }
 }
 
-// This constructor is use for testing only.
+// This constructor is used for testing only.
 RobotiqGripperHardwareInterface::RobotiqGripperHardwareInterface(std::unique_ptr<DriverFactory> driver_factory)
   : driver_factory_{ std::move(driver_factory) }
 {
@@ -89,6 +87,7 @@ hardware_interface::CallbackReturn RobotiqGripperHardwareInterface::on_init(cons
   gripper_max_force_ = info_.hardware_parameters.count("gripper_max_force") ?
                            stod(info_.hardware_parameters["gripper_max_force"]) :
                            kGripperMaxforce;
+
   gripper_position_ = std::numeric_limits<double>::quiet_NaN();
   gripper_velocity_ = std::numeric_limits<double>::quiet_NaN();
   gripper_position_command_ = std::numeric_limits<double>::quiet_NaN();
@@ -105,8 +104,8 @@ hardware_interface::CallbackReturn RobotiqGripperHardwareInterface::on_init(cons
                          [](const auto& cmd_itf) { return cmd_itf.name == hardware_interface::HW_IF_POSITION; });
   if (it == joint.command_interfaces.end())
   {
-    RCLCPP_FATAL(kLogger, "Joint '%s' has does not have expected '%s' interface.", joint.name.c_str(),
-                 joint.command_interfaces[0].name.c_str(), hardware_interface::HW_IF_POSITION);
+    RCLCPP_FATAL(kLogger, "Joint '%s' does not have expected '%s' command interface.",
+                 joint.name.c_str(), hardware_interface::HW_IF_POSITION);
     return CallbackReturn::ERROR;
   }
 
@@ -147,6 +146,7 @@ rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
 RobotiqGripperHardwareInterface::on_configure(const rclcpp_lifecycle::State& previous_state)
 {
   RCLCPP_DEBUG(kLogger, "on_configure");
+
   try
   {
     if (hardware_interface::SystemInterface::on_configure(previous_state) != CallbackReturn::SUCCESS)
@@ -167,6 +167,7 @@ RobotiqGripperHardwareInterface::on_configure(const rclcpp_lifecycle::State& pre
     RCLCPP_ERROR(kLogger, "Cannot configure the Robotiq gripper: %s", e.what());
     return CallbackReturn::ERROR;
   }
+
   return CallbackReturn::SUCCESS;
 }
 
@@ -175,12 +176,10 @@ std::vector<hardware_interface::StateInterface> RobotiqGripperHardwareInterface:
   RCLCPP_DEBUG(kLogger, "export_state_interfaces");
 
   std::vector<hardware_interface::StateInterface> state_interfaces;
-
   state_interfaces.emplace_back(
       hardware_interface::StateInterface(info_.joints[0].name, hardware_interface::HW_IF_POSITION, &gripper_position_));
   state_interfaces.emplace_back(
       hardware_interface::StateInterface(info_.joints[0].name, hardware_interface::HW_IF_VELOCITY, &gripper_velocity_));
-
   return state_interfaces;
 }
 
@@ -189,15 +188,14 @@ std::vector<hardware_interface::CommandInterface> RobotiqGripperHardwareInterfac
   RCLCPP_DEBUG(kLogger, "export_command_interfaces");
 
   std::vector<hardware_interface::CommandInterface> command_interfaces;
-
   command_interfaces.emplace_back(hardware_interface::CommandInterface(
       info_.joints[0].name, hardware_interface::HW_IF_POSITION, &gripper_position_command_));
 
   command_interfaces.emplace_back(
       hardware_interface::CommandInterface(info_.joints[0].name, "set_gripper_max_velocity", &gripper_speed_));
   gripper_speed_ = kGripperMaxSpeed * (info_.hardware_parameters.count("gripper_speed_multiplier") ?
-                                           std::stod(info_.hardware_parameters.at("gripper_speed_multiplier")) :
-                                           1.0);
+                                          std::stod(info_.hardware_parameters.at("gripper_speed_multiplier")) :
+                                          1.0);
 
   command_interfaces.emplace_back(
       hardware_interface::CommandInterface(info_.joints[0].name, "set_gripper_max_effort", &gripper_force_));
@@ -218,7 +216,7 @@ RobotiqGripperHardwareInterface::on_activate(const rclcpp_lifecycle::State& /*pr
 {
   RCLCPP_DEBUG(kLogger, "on_activate");
 
-  // set some default values for joints
+  // Set default values for joints
   if (std::isnan(gripper_position_))
   {
     gripper_position_ = 0;
@@ -231,7 +229,6 @@ RobotiqGripperHardwareInterface::on_activate(const rclcpp_lifecycle::State& /*pr
   {
     driver_->deactivate();
     driver_->activate();
-
     communication_thread_is_running_.store(true);
     communication_thread_ = std::thread([this] { this->background_task(); });
   }
@@ -266,12 +263,13 @@ RobotiqGripperHardwareInterface::on_deactivate(const rclcpp_lifecycle::State& /*
     RCLCPP_ERROR(kLogger, "Failed to deactivate the Robotiq gripper: %s", e.what());
     return CallbackReturn::ERROR;
   }
+
   RCLCPP_INFO(kLogger, "Robotiq Gripper successfully deactivated!");
   return CallbackReturn::SUCCESS;
 }
 
 hardware_interface::return_type RobotiqGripperHardwareInterface::read(const rclcpp::Time& /*time*/,
-                                                                      const rclcpp::Duration& /*period*/)
+                                                                     const rclcpp::Duration& /*period*/)
 {
   gripper_position_ = gripper_closed_pos_ * (gripper_current_state_.load() - kGripperMinPos) / kGripperRange;
 
@@ -292,13 +290,15 @@ hardware_interface::return_type RobotiqGripperHardwareInterface::read(const rclc
 }
 
 hardware_interface::return_type RobotiqGripperHardwareInterface::write(const rclcpp::Time& /*time*/,
-                                                                       const rclcpp::Duration& /*period*/)
+                                                                      const rclcpp::Duration& /*period*/)
 {
   double gripper_pos = (gripper_position_command_ / gripper_closed_pos_) * kGripperRange + kGripperMinPos;
   gripper_pos = std::max(std::min(gripper_pos, 255.0), 0.0);
   write_command_.store(uint8_t(gripper_pos));
+
   const auto gripper_speed_multiplier = std::clamp(fabs(gripper_speed_) / gripper_max_speed_, 0.0, 1.0);
   write_speed_.store(uint8_t(gripper_speed_multiplier * 0xFF));
+
   const auto gripper_force_multiplier = std::clamp(fabs(gripper_force_) / gripper_max_force_, 0.0, 1.0);
   write_force_.store(uint8_t(gripper_force_multiplier * 0xFF));
 
@@ -311,8 +311,7 @@ void RobotiqGripperHardwareInterface::background_task()
   {
     try
     {
-      // Re-activate the gripper
-      // (this can be used, for example, to re-run the auto-calibration).
+      // Re-activate the gripper (e.g., for auto-calibration)
       if (reactivate_gripper_async_cmd_.load())
       {
         this->driver_->deactivate();
@@ -338,8 +337,7 @@ void RobotiqGripperHardwareInterface::background_task()
   }
 }
 
-}  // namespace robotiq_driver
+} // namespace robotiq_driver
 
 #include "pluginlib/class_list_macros.hpp"
-
 PLUGINLIB_EXPORT_CLASS(robotiq_driver::RobotiqGripperHardwareInterface, hardware_interface::SystemInterface)
